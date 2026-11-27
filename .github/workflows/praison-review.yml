@@ -53,7 +53,27 @@ jobs:
           else:
               for f in findings:
                   lines.append(f"- **[{f.severity}]** `{f.path}` L{f.line}: {f.title}")
-          subprocess.check_call(
-              ["gh", "pr", "comment", os.environ["PR"], "--body", "\n".join(lines)]
+          pr = os.environ["PR"]
+          subprocess.check_call(["gh", "pr", "comment", pr, "--body", "\n".join(lines)])
+          head = subprocess.check_output(
+              ["gh", "pr", "view", pr, "--json", "headRefOid"], text=True
           )
+          commit = __import__("json").loads(head)["headRefOid"]
+          repo = subprocess.check_output(
+              ["gh", "repo", "view", "--json", "nameWithOwner"], text=True
+          )
+          owner_repo = __import__("json").loads(repo)["nameWithOwner"]
+          for f in findings:
+              if f.line <= 0 or not f.path:
+                  continue
+              body = f"**[{f.severity}]** {f.title}" + (f"\n\n{f.fix}" if f.fix else "")
+              payload = __import__("json").dumps({
+                  "body": body, "commit_id": commit, "path": f.path, "line": f.line, "side": "RIGHT",
+              })
+              p = subprocess.run(
+                  ["gh", "api", f"repos/{owner_repo}/pulls/{pr}/comments", "-X", "POST", "--input", "-"],
+                  input=payload, text=True, capture_output=True,
+              )
+              if p.returncode != 0:
+                  print(p.stderr or p.stdout)
           PY
