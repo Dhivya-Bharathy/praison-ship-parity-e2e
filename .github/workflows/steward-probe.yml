@@ -1,4 +1,5 @@
-# Phase 2: intentional failing check when README changes (Praison steward fix_check demo).
+# Steward fix_check demo was validated on PR #3 (probe failed → read_pr_state fix_check).
+# This check now passes so the branch can merge; re-enable exit 1 to re-demo steward.
 name: steward-probe
 on:
   pull_request:
@@ -8,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fail when README is in this PR (steward should suggest fix_check)
+      - name: Steward parity probe (green)
         run: |
-          echo "Parity probe: README edits must pass ship/steward testing."
-          exit 1
+          echo "Steward fix_check demo completed; probe is green for merge."
+          exit 0
