@@ -1,0 +1,85 @@
+# Phase 2: open-source Code Review analog — diff in, comment on PR (needs repo secret OPENAI_API_KEY).
+name: praison-review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    env:
+      BASE: ${{ github.event.pull_request.base.ref }}
+      PR: ${{ github.event.pull_request.number }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PraisonAI
+        run: pip install "praisonai==4.8.2"
+      - name: Review diff
+        run: |
+          set -e
+          git fetch origin "$BASE"
+          DIFF="$(git diff "origin/${BASE}...HEAD")"
+          if [ -z "$DIFF" ]; then
+            gh pr comment "$PR" --body "**Praison Ship review:** no diff against \`origin/${BASE}\` — nothing to review."
+            exit 0
+          fi
+          if [ -z "$OPENAI_API_KEY" ]; then
+            gh pr comment "$PR" \
+              --body "**Praison review (observe):** add repo secret \`OPENAI_API_KEY\` to run \`review_diff\` (Claude Code Review analog)."
+            exit 0
+          fi
+          export DIFF
+          python - <<'PY'
+          import os, subprocess
+          from praisonai_code.ship.review import review_diff, review_severity
+          base = os.environ["BASE"]
+          diff = subprocess.check_output(
+              ["git", "diff", f"origin/{base}...HEAD"], text=True, errors="replace"
+          )
+          if not diff.strip():
+              subprocess.check_call([
+                  "gh", "pr", "comment", os.environ["PR"],
+                  "--body", f"**Praison Ship review:** no diff against `origin/{base}` — nothing to review.",
+              ])
+              raise SystemExit(0)
+          findings = review_diff(diff, effort="low")
+          sev = review_severity(findings)
+          lines = [f"**Praison Ship review** (effort=low, severity={sev})"]
+          if not findings:
+              lines.append("No findings.")
+          else:
+              for f in findings:
+                  lines.append(f"- **[{f.severity}]** `{f.path}` L{f.line}: {f.title}")
+          pr = os.environ["PR"]
+          subprocess.check_call(["gh", "pr", "comment", pr, "--body", "\n".join(lines)])
+          head = subprocess.check_output(
+              ["gh", "pr", "view", pr, "--json", "headRefOid"], text=True
+          )
+          commit = __import__("json").loads(head)["headRefOid"]
+          repo = subprocess.check_output(
+              ["gh", "repo", "view", "--json", "nameWithOwner"], text=True
+          )
+          owner_repo = __import__("json").loads(repo)["nameWithOwner"]
+          for f in findings:
+              if f.line <= 0 or not f.path:
+                  continue
+              body = f"**[{f.severity}]** {f.title}" + (f"\n\n{f.fix}" if f.fix else "")
+              payload = __import__("json").dumps({
+                  "body": body, "commit_id": commit, "path": f.path, "line": f.line, "side": "RIGHT",
+              })
+              p = subprocess.run(
+                  ["gh", "api", f"repos/{owner_repo}/pulls/{pr}/comments", "-X", "POST", "--input", "-"],
+                  input=payload, text=True, capture_output=True,
+              )
+              if p.returncode != 0:
+                  print(p.stderr or p.stdout)
+          PY

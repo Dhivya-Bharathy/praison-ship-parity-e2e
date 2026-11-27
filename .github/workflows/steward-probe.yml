@@ -1,0 +1,15 @@
+# Steward fix_check demo was validated on PR #3 (probe failed → read_pr_state fix_check).
+# This check now passes so the branch can merge; re-enable exit 1 to re-demo steward.
+name: steward-probe
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Steward parity probe (green)
+        run: |
+          echo "Steward fix_check demo completed; probe is green for merge."
+          exit 0

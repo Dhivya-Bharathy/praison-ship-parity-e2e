@@ -1,0 +1,20 @@
+# Praison analog of https://code.claude.com/docs/en/approvals-policy
+version: 1
+mode: observe
+rules:
+  - purpose: "Default: two people; when Praison review passes, one seat and Praison may approve."
+    paths: ["**"]
+    verdict:
+      praison: comments
+      seats: 2
+    override:
+      - if: "praison/review = pass"
+        verdict:
+          praison: approves
+          seats: 1
+  - purpose: "Policy and CI workflows need two people."
+    paths: ["**/.praison/**", "**/.github/**"]
+    nested: inherit
+    verdict:
+      praison: comments
+      seats: 2

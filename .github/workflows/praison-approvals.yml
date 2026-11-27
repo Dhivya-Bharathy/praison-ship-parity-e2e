@@ -1,0 +1,61 @@
+name: praison-approvals
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+jobs:
+  approvals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Post Praison approvals status (observe)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          pip install pyyaml
+          python - <<'PY'
+          import json, os, subprocess
+          import yaml
+          path = ".praison/approvals.yml"
+          mode = "observe"
+          seats = "?"
+          if os.path.isfile(path):
+              with open(path, encoding="utf-8") as f:
+                  policy = yaml.safe_load(f) or {}
+              mode = policy.get("mode", "observe")
+              rules = policy.get("rules") or []
+              if rules:
+                  v = (rules[0].get("verdict") or {})
+                  seats = v.get("seats", "?")
+          desc = f"Praison approvals ({mode}): default rule seats={seats} — informational only"
+          state = "success" if mode == "observe" else "pending"
+          payload = {
+              "state": state,
+              "context": "praison/approvals",
+              "description": desc[:140],
+          }
+          repo = os.environ["REPO"]
+          sha = os.environ["HEAD_SHA"]
+          subprocess.check_call(
+              [
+                  "gh",
+                  "api",
+                  f"repos/{repo}/statuses/{sha}",
+                  "-f",
+                  f"state={payload['state']}",
+                  "-f",
+                  f"context={payload['context']}",
+                  "-f",
+                  f"description={payload['description']}",
+              ]
+          )
+          print(json.dumps(payload, indent=2))
+          PY
