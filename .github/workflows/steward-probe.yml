@@ -1,0 +1,14 @@
+# Phase 2: intentional failing check when README changes (Praison steward fix_check demo).
+name: steward-probe
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail when README is in this PR (steward should suggest fix_check)
+        run: |
+          echo "Parity probe: README edits must pass ship/steward testing."
+          exit 1

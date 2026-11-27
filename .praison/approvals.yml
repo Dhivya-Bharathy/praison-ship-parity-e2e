@@ -1,0 +1,13 @@
+# Observe-only analog of Claude .claude/approvals.yml (wire to a required check in a later phase).
+version: 1
+mode: observe
+rules:
+  - purpose: "Default: two humans; docs-only can be one after review passes."
+    paths: ["**"]
+    verdict: { claude: comments, seats: 2 }
+    override:
+      - { if: "praison/review = pass", verdict: { claude: comments, seats: 1 } }
+  - purpose: "Policy + workflows need extra eyes."
+    paths: ["**/.praison/**", "**/.github/**"]
+    nested: inherit
+    verdict: { claude: comments, seats: 2 }
