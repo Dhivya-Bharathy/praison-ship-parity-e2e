@@ -1,13 +1,20 @@
-# Observe-only analog of Claude .claude/approvals.yml (wire to a required check in a later phase).
+# Praison analog of https://code.claude.com/docs/en/approvals-policy
 version: 1
 mode: observe
 rules:
-  - purpose: "Default: two humans; docs-only can be one after review passes."
+  - purpose: "Default: two people; when Praison review passes, one seat and Praison may approve."
     paths: ["**"]
-    verdict: { claude: comments, seats: 2 }
+    verdict:
+      praison: comments
+      seats: 2
     override:
-      - { if: "praison/review = pass", verdict: { claude: comments, seats: 1 } }
-  - purpose: "Policy + workflows need extra eyes."
+      - if: "praison/review = pass"
+        verdict:
+          praison: approves
+          seats: 1
+  - purpose: "Policy and CI workflows need two people."
     paths: ["**/.praison/**", "**/.github/**"]
     nested: inherit
-    verdict: { claude: comments, seats: 2 }
+    verdict:
+      praison: comments
+      seats: 2

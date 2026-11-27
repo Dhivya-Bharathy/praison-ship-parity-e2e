@@ -29,7 +29,7 @@ jobs:
           git fetch origin "$BASE"
           DIFF="$(git diff "origin/${BASE}...HEAD")"
           if [ -z "$DIFF" ]; then
-            echo "No diff to review."
+            gh pr comment "$PR" --body "**Praison Ship review:** no diff against \`origin/${BASE}\` — nothing to review."
             exit 0
           fi
           if [ -z "$OPENAI_API_KEY" ]; then
@@ -45,6 +45,12 @@ jobs:
           diff = subprocess.check_output(
               ["git", "diff", f"origin/{base}...HEAD"], text=True, errors="replace"
           )
+          if not diff.strip():
+              subprocess.check_call([
+                  "gh", "pr", "comment", os.environ["PR"],
+                  "--body", f"**Praison Ship review:** no diff against `origin/{base}` — nothing to review.",
+              ])
+              raise SystemExit(0)
           findings = review_diff(diff, effort="low")
           sev = review_severity(findings)
           lines = [f"**Praison Ship review** (effort=low, severity={sev})"]
